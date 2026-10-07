@@ -1,0 +1,3331 @@
+<?php
+// WITAD BRIDAL - MySQL VERSION (connects to witad_bridal database)
+session_start();
+
+// ── DATABASE CONFIG ──
+$host = 'localhost';
+$user = 'root';      // change if your MySQL user is different
+$pass = '';          // change if your MySQL root has a password
+$db   = 'witad_bridal';
+
+$conn = mysqli_connect($host, $user, $pass, $db);
+if (!$conn) {
+    die("Database connection failed: " . mysqli_connect_error());
+}
+
+// ── HANDLE FORM SUBMISSION ──
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_booking'])) {
+
+    $full_name      = isset($_POST['full_name']) ? trim(mysqli_real_escape_string($conn, $_POST['full_name'])) : '';
+    $phone          = isset($_POST['phone']) ? trim(mysqli_real_escape_string($conn, $_POST['phone'])) : '';
+    $email          = isset($_POST['email']) ? trim(mysqli_real_escape_string($conn, $_POST['email'])) : '';
+    $wedding_date   = isset($_POST['wedding_date']) ? trim(mysqli_real_escape_string($conn, $_POST['wedding_date'])) : '';
+    $service_needed = isset($_POST['service_needed']) ? trim(mysqli_real_escape_string($conn, $_POST['service_needed'])) : 'General Inquiry';
+    $notes          = isset($_POST['notes']) ? trim(mysqli_real_escape_string($conn, $_POST['notes'])) : '';
+
+    if (empty($full_name) || empty($phone)) {
+        $_SESSION['booking_error'] = 'Please fill in your full name and phone number.';
+        header('Location: witad.php');
+        exit;
+    }
+
+    $submitted_at = date('Y-m-d H:i:s');
+
+    // Insert into feedback table
+    $sql_feedback = "INSERT INTO feedback (full_name, phone, email, wedding_date, service_needed, notes, submitted_at, status) 
+                     VALUES ('$full_name', '$phone', '$email', '$wedding_date', '$service_needed', '$notes', '$submitted_at', 'pending')";
+    mysqli_query($conn, $sql_feedback);
+
+    // Insert into appointments table
+    $sql_appt = "INSERT INTO appointments (full_name, phone, email, wedding_date, service_needed, notes, appointment_date, appointment_time, status, created_at) 
+                  VALUES ('$full_name', '$phone', '$email', '$wedding_date', '$service_needed', '$notes', '', '', 'pending', '$submitted_at')";
+    mysqli_query($conn, $sql_appt);
+
+    header('Location: witad.php?status=success');
+    exit;
+}
+
+// Get messages
+$booking_error = isset($_SESSION['booking_error']) ? $_SESSION['booking_error'] : '';
+if ($booking_error) {
+    unset($_SESSION['booking_error']);
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Witad Bridal Collection | Where Dreams Meet Elegance</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+  <style>
+    :root {
+      --primary:    #F4A7B9;
+      --primary-dk: #e08fa2;
+      --secondary:  #FFFFFF;
+      --accent:     #C9A84C;
+      --accent-lt:  #e8d5a3;
+      --text:       #3D3D3D;
+      --text-lt:    #6b6b6b;
+      --bg:         #FDF8F4;
+      --bg-card:    #fff7f7;
+      --border:     #f0e0d6;
+      --shadow:     rgba(201,168,76,0.15);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    img { max-width: 100%; display: block; }
+    a { text-decoration: none; color: inherit; }
+    h1, h2, h3, h4 {
+      font-family: 'Playfair Display', serif;
+      line-height: 1.25;
+    }
+
+    .serif-sub {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+    }
+
+    .container { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+    .section { padding: 90px 0; }
+
+    .section-label {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 1.1rem;
+      color: var(--accent);
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    .section-title {
+      font-size: clamp(2rem, 4vw, 2.8rem);
+      color: var(--text);
+      margin-bottom: 18px;
+    }
+
+    .section-desc {
+      color: var(--text-lt);
+      max-width: 620px;
+      font-size: 1.02rem;
+    }
+
+    .centered { text-align: center; }
+    .centered .section-desc { margin: 0 auto; }
+
+    .divider {
+      width: 60px; height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--primary));
+      margin: 16px 0 28px;
+    }
+    .divider.center { margin: 16px auto 28px; }
+
+    /* BUTTONS */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 32px;
+      border-radius: 50px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.3s ease;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #202527);
+      color: #f9fbfb;
+      box-shadow: 0 4px 18px rgba(21, 21, 21, 0.4);
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(201,168,76,0.5);
+    }
+
+    .btn-outline {
+      background: linear-gradient(135deg, var(--accent), #414242);
+      color: #fff;
+      border: 2px solid rgba(254, 249, 249, 0.8);
+    }
+    .btn-outline:hover {
+      background: rgba(66, 65, 65, 0.15);
+      border-color: #fff;
+    }
+
+    .btn-outline-dark {
+      background: transparent;
+      color: var(--accent);
+      border: 2px solid var(--accent);
+    }
+    .btn-outline-dark:hover {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .gold-tag {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--accent-lt), var(--accent));
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 14px;
+      border-radius: 50px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .navbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 1000;
+      padding: 18px 0;
+      transition: all 0.4s ease;
+    }
+
+    .navbar.scrolled {
+      background: rgba(253,248,244,0.97);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+      padding: 12px 0;
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      flex-direction: column;
+      line-height: 1;
+    }
+    .logo-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--secondary);
+      transition: color 0.4s;
+      letter-spacing: 1px;
+    }
+    .logo-tag {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 0.8rem;
+      color: var(--accent-lt);
+      letter-spacing: 3px;
+      transition: color 0.4s;
+    }
+    .navbar.scrolled .logo-name { color: var(--text); }
+    .navbar.scrolled .logo-tag  { color: var(--accent); }
+
+    .nav-links {
+      display: flex;
+      gap: 36px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: rgba(255,255,255,0.9);
+      letter-spacing: 0.5px;
+      transition: color 0.3s;
+      position: relative;
+    }
+    .nav-links a::after {
+      content: '';
+      position: absolute;
+      left: 0; bottom: -3px;
+      width: 0; height: 1.5px;
+      background: var(--accent);
+      transition: width 0.3s;
+    }
+    .nav-links a:hover::after,
+    .nav-links a.active::after { width: 100%; }
+
+    .navbar.scrolled .nav-links a { color: var(--text); }
+
+    .nav-cta {
+      background: linear-gradient(135deg, var(--accent), #b8972e) !important;
+      color: #fff !important;
+      padding: 9px 22px;
+      border-radius: 50px;
+      font-size: 0.85rem !important;
+    }
+    .nav-cta::after { display: none !important; }
+
+    .hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .hamburger span {
+      width: 26px; height: 2px;
+      background: #fff;
+      border-radius: 2px;
+      transition: all 0.3s;
+    }
+    .navbar.scrolled .hamburger span { background: var(--text); }
+
+    /* Mobile nav */
+    .mobile-menu {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--bg);
+      z-index: 999;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+    }
+    .mobile-menu.open { display: flex; }
+    .mobile-menu a {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.8rem;
+      color: var(--text);
+      transition: color 0.3s;
+    }
+    .mobile-menu a:hover { color: var(--accent); }
+    .mobile-close {
+      position: absolute;
+      top: 24px; right: 24px;
+      font-size: 2rem;
+      cursor: pointer;
+      color: var(--text);
+    }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+
+    /* HERO */
+    .hero {
+    min-height: 100vh;
+    background-image:url("happytimes.jpeg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    display: flex;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+}
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 60px;
+      background: linear-gradient(transparent, var(--bg));
+    }
+
+    .hero-content {
+      padding-top: 80px;
+      max-width: 700px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap:10px;
+      background: rgba(59, 58, 58, 0.12);
+      border: 1px solid rgba(201,168,76,0.5);
+      backdrop-filter: blur(8px);
+      padding: 8px 20px;
+      border-radius: 50px;
+      color: var(--accent-lt);
+      font-size: 0.82rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.8rem, 7vw, 5rem);
+      color: #fff;
+      line-height: 1.1;
+      margin-bottom: 10px;
+    }
+    .hero h1 em {
+      color: var(--accent-lt);
+      font-style: italic;
+    }
+
+    .hero-sub {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.35rem;
+      color: rgba(255,255,255,0.85);
+      margin-bottom: 40px;
+      max-width: 560px;
+      line-height: 1.6;
+    }
+
+    .hero-btns {
+      display: flex;
+      gap: 150px;
+      flex-wrap: wrap;
+    }
+
+    .hero-scroll {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(10, 10, 10, 0.6);
+      font-size: 0.78rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      animation: bounce 2s infinite;
+    }
+    .hero-scroll i { font-size: 1.2rem; }
+
+    @keyframes bounce {
+      0%,100% { transform: translateX(-50%) translateY(0); }
+      50%      { transform: translateX(-50%) translateY(6px); }
+    }
+
+    /* TRUST BAR */
+    .trust-bar {
+      background: linear-gradient(135deg, var(--text) 0%, #2a1a25 100%);
+      padding: 28px 0;
+    }
+    .trust-items {
+      display: flex;
+      justify-content: center;
+      gap: 60px;
+      flex-wrap: wrap;
+    }
+    .trust-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: rgba(255,255,255,0.9);
+    }
+    .trust-item i {
+      color: var(--accent);
+      font-size: 1.4rem;
+    }
+    .trust-item strong {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.1rem;
+      display: block;
+      line-height: 1;
+    }
+    .trust-item span {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.55);
+      letter-spacing: 1px;
+    }
+
+    /* FEATURED SERVICES */
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 28px;
+      margin-top: 52px;
+    }
+
+    .service-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px 30px;
+      transition: all 0.35s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .service-card::before {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.4s ease;
+    }
+    .service-card:hover { transform: translateY(-6px); box-shadow: 0 20px 50px var(--shadow); }
+    .service-card:hover::before { transform: scaleX(1); }
+
+    .service-icon {
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, rgba(244,167,185,0.2), rgba(201,168,76,0.15));
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      color: var(--accent);
+      margin-bottom: 20px;
+    }
+
+    .service-card h3 {
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+    }
+    .service-card p {
+      font-size: 0.9rem;
+      color: var(--text-lt);
+      line-height: 1.7;
+    }
+
+    /* WHY CHOOSE US */
+    .why-section {
+      background:
+        linear-gradient(135deg, rgba(244,167,185,0.06), rgba(201,168,76,0.04));
+    }
+
+    .why-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: center;
+      margin-top: 0;
+    }
+
+    .why-image-wrap {
+      position: relative;
+    }
+    .why-image-wrap img {
+      width: 100%;
+      height: 560px;
+      object-fit: cover;
+      border-radius: 24px;
+    }
+    .why-badge {
+      position: absolute;
+      bottom: -20px;
+      right: -20px;
+      background: linear-gradient(135deg, var(--accent), #b8972e);
+      color: #fff;
+      width: 130px; height: 130px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      box-shadow: 0 8px 30px rgba(201,168,76,0.4);
+    }
+    .why-badge strong {
+      font-family: 'Playfair Display', serif;
+      font-size: 2rem;
+      line-height: 1;
+    }
+    .why-badge span { font-size: 0.7rem; letter-spacing: 1px; opacity: 0.9; }
+
+    .why-features {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 36px;
+    }
+
+    .why-feature {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .why-feature-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--primary), var(--accent-lt));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+    .why-feature h4 { font-size: 0.95rem; margin-bottom: 4px; }
+    .why-feature p  { font-size: 0.82rem; color: var(--text-lt); line-height: 1.5; }
+
+    /* GALLERY PREVIEW */
+    .gallery-preview {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: 280px 280px;
+      gap: 14px;
+      margin-top: 52px;
+    }
+
+    .gal-item {
+      position: relative;
+      overflow: hidden;
+      border-radius: 16px;
+      cursor: pointer;
+    }
+    .gal-item:first-child { grid-row: 1 / 3; }
+    .gal-item:nth-child(4) { grid-row: 1 / 3; }
+
+    .gal-item img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      transition: transform 0.6s ease;
+    }
+    .gal-item:hover img { transform: scale(1.08); }
+
+    .gal-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(30,20,30,0.6), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+      display: flex;
+      align-items: flex-end;
+      padding: 20px;
+      color: #fff;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.1rem;
+      font-style: italic;
+    }
+    .gal-item:hover .gal-overlay { opacity: 1; }
+
+    /* TESTIMONIALS PREVIEW */
+    .testimonials-section {
+      background: linear-gradient(160deg, #2a1a25 0%, #1e1018 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    .testimonials-section::before {
+      content: '"';
+      font-family: 'Playfair Display', serif;
+      font-size: 300px;
+      color: rgba(201,168,76,0.06);
+      position: absolute;
+      top: -60px; left: 40px;
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    .testimonials-section .section-label,
+    .testimonials-section .section-title { color: #fff; }
+
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 28px;
+      margin-top: 50px;
+    }
+
+    .testi-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(201,168,76,0.2);
+      border-radius: 20px;
+      padding: 36px 30px;
+      backdrop-filter: blur(8px);
+      transition: transform 0.3s;
+    }
+    .testi-card:hover { transform: translateY(-4px); }
+
+    .testi-stars { color: var(--accent); font-size: 0.9rem; margin-bottom: 18px; }
+
+    .testi-quote {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 1.1rem;
+      color: rgba(255,255,255,0.88);
+      line-height: 1.8;
+      margin-bottom: 24px;
+    }
+
+    .testi-author {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .testi-avatar {
+      width: 50px; height: 50px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid var(--accent);
+    }
+    .testi-name {
+      font-weight: 600;
+      color: #fff;
+      font-size: 0.95rem;
+    }
+    .testi-date {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.45);
+      margin-top: 2px;
+    }
+
+    /* CTA BANNER */
+    .cta-banner {
+      background:
+        linear-gradient(135deg, rgba(244,167,185,0.15), rgba(201,168,76,0.1)),
+        var(--bg-card);
+      border-radius: 28px;
+      padding: 72px 60px;
+      text-align: center;
+      margin: 0 24px;
+      border: 1px solid var(--border);
+    }
+    .cta-banner h2 {
+      font-size: clamp(2rem, 4vw, 2.8rem);
+      margin-bottom: 16px;
+    }
+    .cta-banner p {
+      color: var(--text-lt);
+      font-size: 1rem;
+      max-width: 520px;
+      margin: 0 auto 36px;
+    }
+    .cta-btns { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+
+    /* ═══════════════════════════════════════
+       ── ABOUT PAGE ──
+    ═══════════════════════════════════════ */
+    .about-hero {
+      height: 380px;
+      background:
+        linear-gradient(135deg, rgba(30,20,30,0.7), rgba(60,30,50,0.5)),
+        url('https://images.unsplash.com/photo-1544717301-9cdcb1f5940f?w=1400&q=80') center/cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #fff;
+      padding-top: 80px;
+    }
+    .about-hero h1 { font-size: clamp(2.5rem, 5vw, 4rem); margin-bottom: 12px; }
+    .about-hero p  { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.3rem; opacity: 0.85; }
+
+    .about-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 70px;
+      align-items: center;
+    }
+
+    .about-image-stack {
+      position: relative;
+      height: 520px;
+    }
+    .about-img-main {
+      position: absolute;
+      right: 0; top: 0;
+      width: 80%;
+      height: 420px;
+      object-fit: cover;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+    }
+    .about-img-accent {
+      position: absolute;
+      left: 0; bottom: 0;
+      width: 55%;
+      height: 260px;
+      object-fit: cover;
+      border-radius: 16px;
+      border: 6px solid var(--bg);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+    }
+
+    .mv-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 40px;
+    }
+
+    .mv-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 26px 22px;
+    }
+    .mv-card h4 {
+      font-size: 0.95rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+    }
+    .mv-card p { font-size: 0.87rem; color: var(--text-lt); line-height: 1.65; }
+
+    .values-section {
+      background: linear-gradient(135deg, #2a1a25, #1e1018);
+    }
+    .values-section .section-label,
+    .values-section .section-title { color: #fff; }
+    .values-section .divider { background: linear-gradient(90deg, var(--accent), var(--primary)); }
+
+    .values-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-top: 50px;
+    }
+
+    .value-card {
+      text-align: center;
+      padding: 40px 28px;
+      border: 1px solid rgba(201,168,76,0.2);
+      border-radius: 20px;
+      background: rgba(255,255,255,0.03);
+      transition: all 0.3s;
+    }
+    .value-card:hover {
+      background: rgba(201,168,76,0.08);
+      border-color: rgba(201,168,76,0.4);
+      transform: translateY(-4px);
+    }
+    .value-card .icon {
+      font-size: 2.2rem;
+      color: var(--accent);
+      margin-bottom: 18px;
+    }
+    .value-card h3 { color: #fff; font-size: 1.2rem; margin-bottom: 10px; }
+    .value-card p  { color: rgba(255,255,255,0.6); font-size: 0.87rem; line-height: 1.7; }
+
+    /* TEAM */
+    .team-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 28px;
+      margin-top: 52px;
+    }
+    .team-card {
+      text-align: center;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .team-card:hover { transform: translateY(-6px); box-shadow: 0 20px 50px var(--shadow); }
+    .team-card img { width: 100%; height: 280px; object-fit: cover; }
+    .team-info { padding: 24px 20px; }
+    .team-info h3 { font-size: 1.1rem; margin-bottom: 4px; }
+    .team-info span { font-size: 0.82rem; color: var(--accent); letter-spacing: 1px; }
+
+    /* ═══════════════════════════════════════
+       ── SERVICES PAGE ──
+    ═══════════════════════════════════════ */
+    .services-page-hero {
+      height: 360px;
+      background:
+        linear-gradient(135deg, rgba(30,20,30,0.68), rgba(201,168,76,0.15)),
+        url('https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=1400&q=80') center/cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #fff;
+      padding-top: 80px;
+    }
+
+    .services-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+      margin-top: 52px;
+    }
+
+    .service-detail-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      overflow: hidden;
+      transition: all 0.35s;
+    }
+    .service-detail-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 24px 60px var(--shadow);
+    }
+    .service-detail-card img {
+      width: 100%; height: 220px;
+      object-fit: cover;
+      transition: transform 0.5s;
+    }
+    .service-detail-card:hover img { transform: scale(1.05); }
+    .sd-body { padding: 28px 26px; }
+    .sd-body .service-icon { margin-bottom: 14px; }
+    .sd-body h3 { font-size: 1.22rem; margin-bottom: 10px; }
+    .sd-body p  { font-size: 0.88rem; color: var(--text-lt); line-height: 1.75; }
+    .sd-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent);
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 16px;
+      transition: gap 0.3s;
+    }
+    .sd-link:hover { gap: 10px; }
+
+    /* PROCESS */
+    .process-section {
+      background: linear-gradient(135deg, rgba(244,167,185,0.07), rgba(201,168,76,0.04));
+    }
+
+    .process-steps {
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+      margin-top: 52px;
+      position: relative;
+    }
+    .process-steps::before {
+      content: '';
+      position: absolute;
+      top: 36px;
+      left: 10%;
+      right: 10%;
+      height: 2px;
+      background: linear-gradient(90deg, var(--primary), var(--accent), var(--primary));
+    }
+    .process-step {
+      flex: 1;
+      text-align: center;
+      padding: 0 16px;
+      position: relative;
+    }
+    .step-num {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, var(--accent), #b8972e);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Playfair Display', serif;
+      font-size: 1.5rem;
+      color: #fff;
+      margin: 0 auto 20px;
+      position: relative;
+      z-index: 1;
+      box-shadow: 0 6px 20px rgba(201,168,76,0.35);
+    }
+    .process-step h4 { font-size: 1rem; margin-bottom: 8px; }
+    .process-step p  { font-size: 0.83rem; color: var(--text-lt); line-height: 1.65; }
+
+    /* ═══════════════════════════════════════
+       ── GALLERY PAGE ──
+    ═══════════════════════════════════════ */
+    .gallery-hero {
+      height: 340px;
+      background:
+        linear-gradient(135deg, rgba(30,20,30,0.65), rgba(201,168,76,0.12)),
+        url('https://images.unsplash.com/photo-1511285560929-80b456fea0bc?w=1400&q=80') center/cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #fff;
+      padding-top: 80px;
+    }
+
+    .gallery-filters {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 52px;
+    }
+    .filter-btn {
+      padding: 10px 24px;
+      border-radius: 50px;
+      border: 1.5px solid var(--border);
+      background: transparent;
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.85rem;
+      color: var(--text-lt);
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .filter-btn:hover,
+    .filter-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .gallery-masonry {
+      columns: 4;
+      column-gap: 16px;
+      margin-top: 36px;
+    }
+    .gallery-masonry .gal-item {
+      break-inside: avoid;
+      margin-bottom: 16px;
+      border-radius: 14px;
+    }
+    .gallery-masonry .gal-item img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 14px;
+    }
+
+    /* LIGHTBOX */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.92);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+    .lightbox.open { display: flex; }
+    .lightbox img { max-width: 90vw; max-height: 88vh; border-radius: 12px; object-fit: contain; }
+    .lightbox-close {
+      position: absolute;
+      top: 24px; right: 28px;
+      color: #fff;
+      font-size: 2rem;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+    }
+    .lightbox-close:hover { opacity: 1; }
+
+    /* ═══════════════════════════════════════
+       ── VISIT US PAGE ──
+    ═══════════════════════════════════════ */
+    .visit-hero {
+      height: 340px;
+      background:
+        linear-gradient(135deg, rgba(30,20,30,0.68), rgba(201,168,76,0.15)),
+        url('https://images.unsplash.com/photo-1522413452208-996ff3f3e740?w=1400&q=80') center/cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #fff;
+      padding-top: 80px;
+    }
+
+    .visit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      margin-top: 0;
+    }
+
+    .info-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px 30px;
+      margin-bottom: 24px;
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    .info-card-icon {
+      width: 52px; height: 52px;
+      background: linear-gradient(135deg, var(--primary), var(--accent-lt));
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 1.3rem;
+      flex-shrink: 0;
+    }
+    .info-card h4 { font-size: 1rem; margin-bottom: 6px; color: var(--accent); }
+    .info-card p, .info-card a { font-size: 0.9rem; color: var(--text-lt); line-height: 1.8; }
+    .info-card a:hover { color: var(--accent); }
+
+    .map-container {
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+      height: 400px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+      color: var(--text-lt);
+      font-size: 0.9rem;
+    }
+    .map-container i { font-size: 3rem; color: var(--primary); }
+
+    /* APPOINTMENT FORM */
+    .appt-form-section {
+      background: linear-gradient(135deg, rgba(244,167,185,0.07), rgba(201,168,76,0.04));
+    }
+
+    /* ═══════════════════════════════════════
+       ── FAQ PAGE ──
+    ═══════════════════════════════════════ */
+    .faq-hero {
+      height: 320px;
+      background:
+        linear-gradient(135deg, rgba(30,20,30,0.68), rgba(201,168,76,0.12)),
+        url('https://images.unsplash.com/photo-1521543298264-785fba5614bd?w=1400&q=80') center/cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #fff;
+      padding-top: 80px;
+    }
+
+    .faq-container { max-width: 820px; margin: 0 auto; }
+
+    .faq-category { margin-bottom: 52px; }
+    .faq-category h3 {
+      font-size: 1.4rem;
+      color: var(--accent);
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .faq-item {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      background: var(--bg-card);
+    }
+
+    .faq-question {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 22px 26px;
+      background: none;
+      border: none;
+      text-align: left;
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text);
+      cursor: pointer;
+      transition: color 0.3s;
+    }
+    .faq-question:hover { color: var(--accent); }
+    .faq-question i {
+      color: var(--accent);
+      transition: transform 0.3s;
+      flex-shrink: 0;
+    }
+    .faq-item.open .faq-question i { transform: rotate(45deg); }
+
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s ease, padding 0.3s;
+      font-size: 0.9rem;
+      color: var(--text-lt);
+      line-height: 1.8;
+    }
+    .faq-item.open .faq-answer {
+      max-height: 200px;
+      padding: 0 26px 22px;
+    }
+
+    /* ═══════════════════════════════════════
+       ── TESTIMONIALS PAGE ──
+    ═══════════════════════════════════════ */
+    .testimonials-hero {
+      height: 340px;
+      background:
+        linear-gradient(135deg, rgba(30,20,30,0.68), rgba(244,167,185,0.2)),
+        url('https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?w=1400&q=80') center/cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #fff;
+      padding-top: 80px;
+    }
+
+    .rating-summary {
+      background: linear-gradient(135deg, var(--text), #2a1a25);
+      color: #fff;
+      padding: 52px 0;
+    }
+    .rating-items {
+      display: flex;
+      gap: 60px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .rating-item { text-align: center; }
+    .rating-item .big-num {
+      font-family: 'Playfair Display', serif;
+      font-size: 3.5rem;
+      line-height: 1;
+      color: var(--accent);
+    }
+    .rating-item .stars { color: var(--accent); margin: 6px 0; }
+    .rating-item span { font-size: 0.8rem; color: rgba(255,255,255,0.55); }
+
+    .testi-full-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 28px;
+      margin-top: 52px;
+    }
+
+    .testi-full-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 36px 30px;
+      position: relative;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .testi-full-card:hover { transform: translateY(-6px); box-shadow: 0 20px 50px var(--shadow); }
+    .testi-full-card .quote-icon {
+      font-size: 3rem;
+      color: var(--primary);
+      opacity: 0.4;
+      line-height: 1;
+      margin-bottom: 10px;
+    }
+
+    /* ═══════════════════════════════════════
+       ── BLOG PAGE ──
+    ═══════════════════════════════════════ */
+    .blog-hero {
+      height: 340px;
+      background:
+        linear-gradient(135deg, rgba(30,20,30,0.68), rgba(201,168,76,0.12)),
+        url('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1400&q=80') center/cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #fff;
+      padding-top: 80px;
+    }
+
+    .blog-layout {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 52px;
+      margin-top: 52px;
+    }
+
+    .blog-featured {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      overflow: hidden;
+      margin-bottom: 36px;
+    }
+    .blog-featured img { width: 100%; height: 340px; object-fit: cover; }
+    .blog-featured-body { padding: 36px; }
+
+    .blog-posts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .blog-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .blog-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px var(--shadow); }
+    .blog-card img { width: 100%; height: 190px; object-fit: cover; }
+    .blog-card-body { padding: 22px 20px; }
+
+    .blog-cat-tag {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .blog-card h3 { font-size: 1rem; margin-bottom: 8px; line-height: 1.4; }
+    .blog-card p  { font-size: 0.82rem; color: var(--text-lt); }
+    .blog-meta { font-size: 0.78rem; color: var(--text-lt); margin-top: 12px; display: flex; gap: 14px; }
+
+    .blog-sidebar {
+      position: sticky;
+      top: 100px;
+    }
+    .sidebar-widget {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 28px 24px;
+      margin-bottom: 24px;
+    }
+    .sidebar-widget h4 {
+      font-size: 1rem;
+      margin-bottom: 18px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .cat-list { list-style: none; }
+    .cat-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.88rem;
+      color: var(--text-lt);
+      cursor: pointer;
+      transition: color 0.3s;
+    }
+    .cat-list li:hover { color: var(--accent); }
+    .cat-count {
+      background: var(--accent-lt);
+      color: var(--accent);
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 50px;
+    }
+    .recent-post {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      cursor: pointer;
+    }
+    .recent-post img { width: 60px; height: 60px; object-fit: cover; border-radius: 10px; }
+    .recent-post h5 { font-size: 0.85rem; line-height: 1.4; margin-bottom: 4px; }
+    .recent-post span { font-size: 0.75rem; color: var(--text-lt); }
+
+    /* ═══════════════════════════════════════
+       ── CONTACT PAGE ──
+    ═══════════════════════════════════════ */
+    .contact-hero {
+      height: 320px;
+      background:
+        linear-gradient(135deg, rgba(30,20,30,0.68), rgba(201,168,76,0.12)),
+        url('https://images.unsplash.com/photo-1522413452208-996ff3f3e740?w=1400&q=80') center/cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #fff;
+      padding-top: 80px;
+    }
+
+    .contact-layout {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 60px;
+      margin-top: 0;
+    }
+
+    .contact-info { padding-top: 10px; }
+
+    .social-links {
+      display: flex;
+      gap: 14px;
+      margin-top: 28px;
+    }
+    .social-link {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      color: #fff;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .social-link:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
+    .social-link.fb { background: #1877f2; }
+    .social-link.ig { background: linear-gradient(135deg, #f58529, #dd2a7b, #8134af); }
+    .social-link.tt { background: #000; }
+    .social-link.wa { background: #25d366; }
+
+    /* FORMS */
+    .form-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 44px 40px;
+      box-shadow: 0 8px 40px var(--shadow);
+    }
+
+    .form-group { margin-bottom: 22px; }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.83rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 8px;
+      letter-spacing: 0.3px;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="date"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 13px 18px;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg);
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.9rem;
+      color: var(--text);
+      transition: border-color 0.3s, box-shadow 0.3s;
+      outline: none;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(201,168,76,0.12);
+    }
+
+    textarea { resize: vertical; min-height: 130px; }
+
+    .submit-btn {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, var(--accent), #b8972e);
+      color: #fff;
+      border: none;
+      border-radius: 50px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      transition: all 0.3s;
+      box-shadow: 0 4px 18px rgba(201,168,76,0.4);
+    }
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(201,168,76,0.5);
+    }
+
+    .whatsapp-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px;
+      background: #25d366;
+      color: #fff;
+      border-radius: 50px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-top: 14px;
+      transition: all 0.3s;
+      box-shadow: 0 4px 16px rgba(37,211,102,0.35);
+    }
+    .whatsapp-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(37,211,102,0.45);
+    }
+
+    /* ═══════════════════════════════════════
+       FOOTER
+    ═══════════════════════════════════════ */
+    footer {
+      background: linear-gradient(160deg, #1e1018 0%, #2a1a25 50%, #1a1020 100%);
+      color: #fff;
+      padding: 80px 0 0;
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr 1fr 1.2fr;
+      gap: 50px;
+      padding-bottom: 60px;
+    }
+
+    .footer-brand .logo-name { color: #fff; font-size: 1.7rem; }
+    .footer-brand .logo-tag  { color: var(--accent-lt); }
+
+    .footer-brand p {
+      font-size: 0.87rem;
+      color: rgba(255,255,255,0.55);
+      line-height: 1.8;
+      margin: 18px 0 24px;
+      max-width: 280px;
+    }
+
+    .footer-social {
+      display: flex;
+      gap: 12px;
+    }
+    .footer-social a {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255,255,255,0.7);
+      font-size: 1rem;
+      transition: all 0.3s;
+    }
+    .footer-social a:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .footer-col h4 {
+      font-size: 1rem;
+      color: #fff;
+      margin-bottom: 22px;
+      position: relative;
+      padding-bottom: 12px;
+    }
+    .footer-col h4::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0;
+      width: 36px; height: 2px;
+      background: var(--accent);
+    }
+
+    .footer-links { list-style: none; }
+    .footer-links li { margin-bottom: 12px; }
+    .footer-links a {
+      font-size: 0.87rem;
+      color: rgba(255,255,255,0.55);
+      transition: color 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .footer-links a:hover { color: var(--accent); }
+    .footer-links i { font-size: 0.65rem; color: var(--accent); }
+
+    .footer-contact-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .footer-contact-item i {
+      color: var(--accent);
+      font-size: 1rem;
+      margin-top: 2px;
+      width: 18px;
+    }
+    .footer-contact-item span {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.55);
+      line-height: 1.6;
+    }
+    .footer-contact-item a {
+      color: rgba(255,255,255,0.55);
+      transition: color 0.3s;
+    }
+    .footer-contact-item a:hover { color: var(--accent); }
+
+    .footer-bottom {
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding: 24px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .footer-bottom p { font-size: 0.82rem; color: rgba(255,255,255,0.35); }
+    .footer-bottom a { color: var(--accent); }
+    .footer-bottom-links {
+      display: flex;
+      gap: 24px;
+    }
+    .footer-bottom-links a {
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.35);
+      transition: color 0.3s;
+    }
+    .footer-bottom-links a:hover { color: var(--accent); }
+
+    /* ═══════════════════════════════════════
+       FLOATING WHATSAPP
+    ═══════════════════════════════════════ */
+    .fab-whatsapp {
+      position: fixed;
+      bottom: 32px;
+      right: 32px;
+      width: 58px; height: 58px;
+      background: #25d366;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 1.6rem;
+      box-shadow: 0 6px 24px rgba(37,211,102,0.45);
+      z-index: 900;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .fab-whatsapp:hover {
+      transform: scale(1.1);
+      box-shadow: 0 10px 32px rgba(3, 243, 91, 0.55);
+    }
+
+    /* BACK TO TOP */
+    .back-top {
+      position: fixed;
+      bottom: 32px;
+      right: 100px;
+      width: 46px; height: 46px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 1.1rem;
+      z-index: 900;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+    .back-top.visible { opacity: 1; transform: translateY(0); }
+
+    /* TOAST */
+    .toast {
+      position: fixed;
+      bottom: 100px;
+      right: 32px;
+      background: var(--text);
+      color: #fff;
+      padding: 14px 24px;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      z-index: 3000;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.3s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast i { color: #4ade80; margin-right: 8px; }
+
+    /* ═══════════════════════════════════════
+       RESPONSIVE
+    ═══════════════════════════════════════ */
+    @media (max-width: 1024px) {
+      .gallery-preview { grid-template-columns: repeat(3, 1fr); grid-template-rows: auto; }
+      .gal-item:first-child, .gal-item:nth-child(4) { grid-row: auto; }
+      .why-badge { right: 0; bottom: -10px; }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+      .blog-layout { grid-template-columns: 1fr; }
+      .blog-sidebar { position: static; }
+      .values-grid { grid-template-columns: repeat(2, 1fr); }
+      .gallery-masonry { columns: 3; }
+    }
+
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .hamburger { display: flex; }
+      .why-grid,
+      .about-grid,
+      .visit-grid,
+      .contact-layout,
+      .mv-cards { grid-template-columns: 1fr; }
+      .about-image-stack { height: 340px; }
+      .why-features { grid-template-columns: 1fr; }
+      .footer-grid { grid-template-columns: 1fr; gap: 36px; }
+      .process-steps { flex-direction: column; align-items: center; gap: 32px; }
+      .process-steps::before { display: none; }
+      .gallery-preview { grid-template-columns: 1fr 1fr; }
+      .gallery-masonry { columns: 2; }
+      .blog-posts-grid { grid-template-columns: 1fr; }
+      .form-row { grid-template-columns: 1fr; }
+      .cta-banner { padding: 52px 28px; margin: 0 12px; }
+      .form-card { padding: 30px 22px; }
+      .footer-bottom { flex-direction: column; text-align: center; }
+      .values-grid { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 2.8rem; }
+      .rating-items { gap: 36px; }
+    }
+
+    @media (max-width: 480px) {
+      .trust-items { gap: 28px; flex-direction: column; }
+      .gallery-masonry { columns: 1; }
+      .gallery-preview { grid-template-columns: 1fr; }
+      .services-grid { grid-template-columns: 1fr; }
+      .testimonials-grid { grid-template-columns: 1fr; }
+      .footer-bottom-links { flex-direction: column; gap: 10px; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ══════════════════════════════════════
+       NAVBAR
+  ══════════════════════════════════════ -->
+  <nav class="navbar" id="navbar">
+    <div class="container nav-inner">
+      <a class="logo" href="#" onclick="showPage('home')">
+        <span class="logo-name">Witad</span>
+        <span class="logo-tag">Bridal Collection</span>
+      </a>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="#" onclick="showPage('home')"     id="nav-home">Home</a></li>
+        <li><a href="#" onclick="showPage('about')"    id="nav-about">About Us</a></li>
+        <li><a href="#" onclick="showPage('services')" id="nav-services">Services</a></li>
+        <li><a href="#" onclick="showPage('gallery')"  id="nav-gallery">Gallery</a></li>
+        <li><a href="#" onclick="showPage('blog')"     id="nav-blog">Blog</a></li>
+        <li><a href="#" onclick="showPage('testimonials')" id="nav-testimonials">Reviews</a></li>
+        <li><a href="#" onclick="showPage('visit')"    id="nav-visit">Visit Us</a></li>
+        <li><a href="#" onclick="showPage('faq')"      id="nav-faq">FAQ</a></li>
+        <li><a href="#" onclick="showPage('contact')" class="nav-cta" id="nav-contact">Book Appointment</a></li>
+      </ul>
+      <div class="hamburger" id="hamburger" onclick="openMobile()">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- MOBILE MENU -->
+  <div class="mobile-menu" id="mobileMenu">
+    <span class="mobile-close" onclick="closeMobile()"><i class="fa fa-times"></i></span>
+    <a href="#" onclick="showPage('home');closeMobile()">Home</a>
+    <a href="#" onclick="showPage('about');closeMobile()">About Us</a>
+    <a href="#" onclick="showPage('services');closeMobile()">Services</a>
+    <a href="#" onclick="showPage('gallery');closeMobile()">Gallery</a>
+    <a href="#" onclick="showPage('blog');closeMobile()">Blog</a>
+    <a href="#" onclick="showPage('testimonials');closeMobile()">Reviews</a>
+    <a href="#" onclick="showPage('visit');closeMobile()">Visit Us</a>
+    <a href="#" onclick="showPage('faq');closeMobile()">FAQ</a>
+    <a href="#" onclick="showPage('contact');closeMobile()">Contact</a>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       HOME PAGE
+  ══════════════════════════════════════ -->
+    <!-- SUCCESS MESSAGE -->
+  <?php if (isset($_GET['status']) && $_GET['status'] == 'success'): ?>
+  <div style="position:fixed;top:90px;left:50%;transform:translateX(-50%);z-index:2001;background:#10b981;color:#fff;padding:14px 28px;border-radius:12px;font-size:0.95rem;font-weight:500;box-shadow:0 8px 30px rgba(16,185,129,0.3);display:flex;align-items:center;gap:10px;">
+    <i class="fa fa-check-circle"></i> Thank you! Your appointment request has been received. We'll contact you within 24 hours.
+    <span style="margin-left:10px;cursor:pointer;font-size:1.2rem;" onclick="this.parentElement.style.display='none'">&times;</span>
+  </div>
+  <?php endif; ?>
+
+  <!-- ERROR MESSAGE -->
+  <?php if (!empty($booking_error)): ?>
+  <div style="position:fixed;top:90px;left:50%;transform:translateX(-50%);z-index:2001;background:#ef4444;color:#fff;padding:14px 28px;border-radius:12px;font-size:0.95rem;font-weight:500;box-shadow:0 8px 30px rgba(239,68,68,0.3);display:flex;align-items:center;gap:10px;max-width:90%;">
+    <i class="fa fa-exclamation-circle"></i> <?php echo $booking_error; ?>
+    <span style="margin-left:10px;cursor:pointer;font-size:1.2rem;" onclick="this.parentElement.style.display='none'">&times;</span>
+  </div>
+  <?php endif; ?>
+
+<div class="page active" id="page-home">
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="container">
+        <div class="hero-content">
+          <div class="hero-badge">
+            <i class="fa fa-crown"></i>
+            Uganda's Premier Bridal Destination
+          </div>
+          <h1>Where Dreams<br>Meet <em>Elegance</em></h1>
+          <p class="hero-sub">
+            Discover stunning bridal gowns, exquisite accessories, and personalized bridal services designed to make your special day unforgettable.
+          </p>
+          <div class="hero-btns">
+            <a class="btn btn-primary" href="#" onclick="showPage('contact')">
+              <i class="fa fa-calendar"></i> Book Appointment
+            </a>
+            <a class="btn btn-outline" href="#" onclick="showPage('gallery')">
+              <i class="fa fa-images"></i> Explore Collection
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="hero-scroll">
+        <span>Scroll</span>
+        <i class="fa fa-chevron-down"></i>
+      </div>
+    </section>
+
+    <!-- TRUST BAR -->
+    <div class="trust-bar">
+      <div class="container">
+        <div class="trust-items">
+          <div class="trust-item">
+            <i class="fa fa-gem"></i>
+            <div>
+              <strong>500+</strong>
+              <span>Happy Brides</span>
+            </div>
+          </div>
+          <div class="trust-item">
+            <i class="fa fa-star"></i>
+            <div>
+              <strong>5-Star</strong>
+              <span>Rated Service</span>
+            </div>
+          </div>
+          <div class="trust-item">
+            <i class="fa fa-crown"></i>
+            <div>
+              <strong>Premium</strong>
+              <span>Gown Collections</span>
+            </div>
+          </div>
+          <div class="trust-item">
+            <i class="fa fa-heart"></i>
+            <div>
+              <strong>Personalized</strong>
+              <span>Styling Experience</span>
+            </div>
+          </div>
+          <div class="trust-item">
+            <i class="fa fa-scissors"></i>
+            <div>
+              <strong>Expert</strong>
+              <span>Alterations & Fittings</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FEATURED SERVICES -->
+    <section class="section">
+      <div class="container">
+        <div class="centered">
+          <span class="section-label">What We Offer</span>
+          <h2 class="section-title">Our Signature Services</h2>
+          <div class="divider center"></div>
+          <p class="section-desc">From the perfect gown to the finishing touch — we're with you every step of your bridal journey.</p>
+        </div>
+        <div class="services-grid">
+          <div class="service-card">
+            <div class="service-icon"><i class="fa fa-star"></i></div>
+            <h3>Bridal Gown Sales</h3>
+            <p>Explore a curated range of luxurious Mushanana designed for every style, body type, and dream aesthetic.</p>
+          </div>
+          <div class="service-card">
+            <div class="service-icon"><i class="fa fa-tag"></i></div>
+            <h3>Bridal Gown Rentals</h3>
+            <p>Affordable and elegant rental options for brides seeking sophistication without compromise on beauty.</p>
+          </div>
+          <div class="service-card">
+            <div class="service-icon"><i class="fa fa-magic"></i></div>
+            <h3>Bridal Styling</h3>
+            <p>Professional consultations to help you achieve your desired wedding-day look with expert guidance.</p>
+          </div>
+          <div class="service-card">
+            <div class="service-icon"><i class="fa fa-heart"></i></div>
+            <h3>Bridesmaids Dresses</h3>
+            <p>Beautiful coordinated dresses in various colors and designs to complement your special day perfectly.</p>
+          </div>
+          <div class="service-card">
+            <div class="service-icon"><i class="fa fa-gem"></i></div>
+            <h3>Bridal Accessories</h3>
+            <p>Veils, tiaras, jewelry, shoes, and every finishing touch to complete your perfect bridal look.</p>
+          </div>
+          <div class="service-card">
+            <div class="service-icon"><i class="fa fa-scissors"></i></div>
+            <h3>Alterations & Fittings</h3>
+            <p>Expert adjustments ensuring your gown fits flawlessly and feels comfortable throughout your big day.</p>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:40px;">
+          <a class="btn btn-outline-dark" href="#" onclick="showPage('services')">
+            <i class="fa fa-arrow-right"></i> View All Services
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- WHY CHOOSE US -->
+    <section class="section why-section">
+      <div class="container">
+        <div class="why-grid">
+          <div class="why-image-wrap">
+            <img src="mushanana3.jpeg" alt="Bride in elegant gown" />
+            <div class="why-badge">
+              <strong>500+</strong>
+              <span>HAPPY<br>BRIDES</span>
+            </div>
+          </div>
+          <div>
+            <span class="section-label">Why Choose Us</span>
+            <h2 class="section-title">The Witad Bridal Difference</h2>
+            <div class="divider"></div>
+            <p style="color:var(--text-lt);font-size:0.95rem;line-height:1.85;">
+              At Witad Bridal Collection, we believe every bride deserves to feel extraordinary. Our experienced team combines expertise, warmth, and a deep passion for bridal fashion to ensure your experience is as beautiful as the gown you'll wear.
+            </p>
+            <div class="why-features">
+              <div class="why-feature">
+                <div class="why-feature-icon"><i class="fa fa-star"></i></div>
+                <div>
+                  <h4>Curated Collections</h4>
+                  <p>Handpicked gowns from top designers for every style.</p>
+                </div>
+              </div>
+              <div class="why-feature">
+                <div class="why-feature-icon"><i class="fa fa-user-tie"></i></div>
+                <div>
+                  <h4>Expert Consultants</h4>
+                  <p>Personalized guidance from our bridal specialists.</p>
+                </div>
+              </div>
+              <div class="why-feature">
+                <div class="why-feature-icon"><i class="fa fa-scissors"></i></div>
+                <div>
+                  <h4>Perfect Fit</h4>
+                  <p>Professional alterations for your ideal silhouette.</p>
+                </div>
+              </div>
+              <div class="why-feature">
+                <div class="why-feature-icon"><i class="fa fa-heart"></i></div>
+                <div>
+                  <h4>Memorable Experience</h4>
+                  <p>Stress-free, joyful, and unforgettable bridal journey.</p>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:36px;">
+              <a class="btn btn-primary" href="#" onclick="showPage('about')">
+                <i class="fa fa-info-circle"></i> Our Story
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GALLERY PREVIEW -->
+    <section class="section">
+      <div class="container">
+        <div class="centered">
+          <span class="section-label">Our Gallery</span>
+          <h2 class="section-title">A Glimpse of Elegance</h2>
+          <div class="divider center"></div>
+          <p class="section-desc">Every gown tells a story. Browse a selection of our most beloved bridal looks.</p>
+        </div>
+        <div class="gallery-preview">
+          <div class="gal-item" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="wedding gown.jpeg" alt="Wedding Gown" />
+            <div class="gal-overlay">Mushanana</div>
+          </div>
+          <div class="gal-item" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="bridal style.jpeg" alt="Bridal Style" />
+            <div class="gal-overlay">Bridal Styling</div>
+          </div>
+          <div class="gal-item" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="happy bride.jpeg" alt="Happy Bride" />
+            <div class="gal-overlay">Happy Bride</div>
+          </div>
+          <div class="gal-item" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="accessories 2.jpeg" alt="Accessories" />
+            <div class="gal-overlay">Accessories</div>
+          </div>
+          <div class="gal-item" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="bridesmaid.jpeg" alt="Bridesmaids" />
+            <div class="gal-overlay">Bridesmaids</div>
+          </div>
+          <div class="gal-item" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="fashion.jpeg" alt="Fashion" />
+            <div class="gal-overlay">Collections</div>
+          </div>
+          <div class="gal-item" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="elegance.jpeg" alt="Elegance" />
+            <div class="gal-overlay">Elegance</div>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:40px;">
+          <a class="btn btn-outline-dark" href="#" onclick="showPage('gallery')">
+            <i class="fa fa-images"></i> View Full Gallery
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- TESTIMONIALS PREVIEW -->
+    <section class="section testimonials-section">
+      <div class="container">
+        <div class="centered">
+          <span class="section-label">Bride Stories</span>
+          <h2 class="section-title" style="color:#fff;">Words From Our Brides</h2>
+          <div class="divider center"></div>
+        </div>
+        <div class="testimonials-grid">
+          <div class="testi-card">
+            <div class="testi-stars">★★★★★</div>
+            <p class="testi-quote">"Witad Bridal Collection made my wedding preparations effortless. The team was professional, welcoming, and helped me find the perfect gown. I felt like a true queen!"</p>
+            <div class="testi-author">
+              <img src="WhatsApp Image 2026-06-01 at 16.20.46 (1).jpeg" alt="Sarah M" class="testi-avatar" />
+              <div>
+                <div class="testi-name">Sarah Nakamura</div>
+                <div class="testi-date">March 2025 · Kabwohe-Sheema</div>
+              </div>
+            </div>
+          </div>
+          <div class="testi-card">
+            <div class="testi-stars">★★★★★</div>
+            <p class="testi-quote">"From the moment I walked in, I felt at home. The collection is breathtaking and the staff truly understands what every bride needs. Highly recommend Witad!"</p>
+            <div class="testi-author">
+              <img src="https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=100&q=80" alt="Amara K" class="testi-avatar" />
+              <div>
+                <div class="testi-name">Amara Kiggundu</div>
+                <div class="testi-date">January 2025 · Entebbe</div>
+              </div>
+            </div>
+          </div>
+          <div class="testi-card">
+            <div class="testi-stars">★★★★★</div>
+            <p class="testi-quote">"The alterations team was phenomenal — my dress fit like it was made for me. I couldn't have asked for a more beautiful experience. Thank you Witad!"</p>
+            <div class="testi-author">
+              <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80" alt="Grace O" class="testi-avatar" />
+              <div>
+                <div class="testi-name">Grace Otim</div>
+                <div class="testi-date">December 2024 · Jinja</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:44px;">
+          <a class="btn" style="background:rgba(255,255,255,0.1);border:1.5px solid rgba(255,255,255,0.3);color:#fff;padding:12px 32px;border-radius:50px;" href="#" onclick="showPage('testimonials')">
+            <i class="fa fa-star"></i> Read All Reviews
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA BANNER -->
+    <section class="section" style="padding:90px 0;">
+      <div class="cta-banner">
+        <span class="section-label" style="display:block;margin-bottom:8px;">Begin Your Journey</span>
+        <h2>Your Perfect Gown is Waiting</h2>
+        <p>Book a personalized consultation with our bridal experts and take the first step toward your dream wedding day.</p>
+        <div class="cta-btns">
+          <a class="btn btn-primary" href="#" onclick="showPage('contact')">
+            <i class="fa fa-calendar-check"></i> Book Appointment
+          </a>
+          <a class="btn btn-outline-dark" href="tel:+256XXXXXXXXX">
+            <i class="fa fa-phone"></i> Call Us Now
+          </a>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /home page -->
+
+  <!-- ══════════════════════════════════════
+       ABOUT PAGE
+  ══════════════════════════════════════ -->
+  <div class="page" id="page-about">
+
+    <div class="about-hero">
+      <div>
+        <span class="section-label" style="justify-content:center;display:flex;">Our Story</span>
+        <h1>About Witad Bridal</h1>
+        <p>Dedicated to making every bride extraordinary</p>
+      </div>
+    </div>
+
+    <!-- STORY -->
+    <section class="section">
+      <div class="container">
+        <div class="about-grid">
+          <div class="about-image-stack">
+            <img class="about-img-main" src="happy bride.jpeg" alt="Bridal Collection" />
+            <img class="about-img-accent" src="mushanab.jpeg" alt="Bridal Detail" />
+          </div>
+          <div>
+            <span class="section-label">Who We Are</span>
+            <h2 class="section-title">Witad Bridal Collection</h2>
+            <div class="divider"></div>
+            <p style="color:var(--text-lt);font-size:0.95rem;line-height:1.9;margin-bottom:22px;">
+              Witad Bridal Collection is a premier bridal destination dedicated to helping every bride look and feel extraordinary on her wedding day. We offer a carefully curated collection of Mushanana, bridesmaids' dresses, bridal accessories, and personalized styling services.
+            </p>
+            <p style="color:var(--text-lt);font-size:0.95rem;line-height:1.9;margin-bottom:32px;">
+              Our commitment to elegance, quality, and exceptional customer service ensures that every bride enjoys a memorable and stress-free experience while finding her perfect look. Located in the heart of Kabwohe-Sheema, Uganda, we are honored to be part of your most important day.
+            </p>
+            <div class="gold-tag"><i class="fa fa-crown" style="margin-right:6px;"></i> Kabwohe-Sheema's Finest Bridal Studio</div>
+
+            <div class="mv-cards">
+              <div class="mv-card">
+                <h4><i class="fa fa-bullseye" style="margin-right:6px;"></i>Mission</h4>
+                <p>To provide elegant bridal fashion and exceptional service that helps every bride celebrate her special day with confidence and style.</p>
+              </div>
+              <div class="mv-card">
+                <h4><i class="fa fa-eye" style="margin-right:6px;"></i>Vision</h4>
+                <p>To become the leading bridal fashion destination recognized for excellence, innovation, and unforgettable bridal experiences.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CORE VALUES -->
+    <section class="section values-section">
+      <div class="container">
+        <div class="centered">
+          <span class="section-label">What Guides Us</span>
+          <h2 class="section-title">Our Core Values</h2>
+          <div class="divider center"></div>
+        </div>
+        <div class="values-grid">
+          <div class="value-card">
+            <div class="icon"><i class="fa fa-gem"></i></div>
+            <h3>Elegance</h3>
+            <p>Beauty and refinement guide every gown we curate and every experience we create.</p>
+          </div>
+          <div class="value-card">
+            <div class="icon"><i class="fa fa-user-tie"></i></div>
+            <h3>Professionalism</h3>
+            <p>Our team brings expertise, courtesy, and dedication to every bridal appointment.</p>
+          </div>
+          <div class="value-card">
+            <div class="icon"><i class="fa fa-star"></i></div>
+            <h3>Quality</h3>
+            <p>Only the finest fabrics, craftsmanship, and finishing are worthy of our brides.</p>
+          </div>
+          <div class="value-card">
+            <div class="icon"><i class="fa fa-heart"></i></div>
+            <h3>Customer Satisfaction</h3>
+            <p>Your happiness and confidence are the ultimate measure of our success.</p>
+          </div>
+          <div class="value-card">
+            <div class="icon"><i class="fa fa-palette"></i></div>
+            <h3>Creativity</h3>
+            <p>We embrace innovation and artistry to bring every bride's vision to life.</p>
+          </div>
+          <div class="value-card">
+            <div class="icon"><i class="fa fa-shield-alt"></i></div>
+            <h3>Integrity</h3>
+            <p>Honesty and transparency build the trust that every lasting relationship deserves.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TEAM -->
+    <section class="section">
+      <div class="container">
+        <div class="centered">
+          <span class="section-label">Meet the Team</span>
+          <h2 class="section-title">The People Behind Your Dream</h2>
+          <div class="divider center"></div>
+        </div>
+        <div class="team-grid">
+          <div class="team-card">
+            <img src="atukunda.jpeg" alt="Team Member" />
+            <div class="team-info">
+              <h3>Witad Atukunda</h3>
+              <span>Founder & Lead Stylist</span>
+            </div>
+          </div>
+          <div class="team-card">
+            <img src="Abigaba.jpeg" alt="Team Member" />
+            <div class="team-info">
+              <h3>Abigaba Babra</h3>
+              <span>Bridal Consultant</span>
+            </div>
+          </div>
+          <div class="team-card">
+            <img src="22.jpg" alt="Team Member" />
+            <div class="team-info">
+              <h3>Akankwatsa Patricia</h3>
+              <span>Head of Alterations</span>
+            </div>
+          </div>
+          <div class="team-card">
+            <img src="2.jpg" alt="Team Member" />
+            <div class="team-info">
+              <h3>Atukwase Blessing</h3>
+              <span>Accessories Specialist</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section style="padding:0 0 90px;">
+      <div class="cta-banner">
+        <h2>Ready to Begin Your Story?</h2>
+        <p>Let our team help you find the gown that makes your heart sing.</p>
+        <div class="cta-btns">
+          <a class="btn btn-primary" href="#" onclick="showPage('contact')">
+            <i class="fa fa-calendar"></i> Book a Consultation
+          </a>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /about page -->
+
+  <!-- ══════════════════════════════════════
+       SERVICES PAGE
+  ══════════════════════════════════════ -->
+  <div class="page" id="page-services">
+
+    <div class="services-page-hero">
+      <div>
+        <span class="section-label" style="justify-content:center;display:flex;">What We Offer</span>
+        <h1>Our Services</h1>
+        <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.3rem;opacity:.85;">Complete bridal solutions, all under one roof</p>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="container">
+        <div class="centered">
+          <span class="section-label">For Every Bride</span>
+          <h2 class="section-title">Everything Your Special Day Deserves</h2>
+          <div class="divider center"></div>
+          <p class="section-desc">From your first fitting to your final accessory, we are honoured to be part of your journey.</p>
+        </div>
+        <div class="services-detail-grid">
+
+          <div class="service-detail-card">
+            <img src="https://images.unsplash.com/photo-1519741497674-611481863552?w=600&q=80" alt="Bridal Gown Sales" />
+            <div class="sd-body">
+              <div class="service-icon"><i class="fa fa-star"></i></div>
+              <h3>Bridal Gown Sales</h3>
+              <p>Explore a wide range of luxurious Mushanana designed for every style and preference — from timeless classic to modern chic.</p>
+              <a class="sd-link" href="#" onclick="showPage('contact')">Book Consultation <i class="fa fa-arrow-right"></i></a>
+            </div>
+          </div>
+
+          <div class="service-detail-card">
+            <img src="https://images.unsplash.com/photo-1594552072238-b8a33785b6cd?w=600&q=80" alt="Bridal Gown Rentals" />
+            <div class="sd-body">
+              <div class="service-icon"><i class="fa fa-tag"></i></div>
+              <h3>Bridal Gown Rentals</h3>
+              <p>Affordable and elegant rental options for brides seeking sophistication without compromise. Look stunning, pay smart.</p>
+              <a class="sd-link" href="#" onclick="showPage('contact')">Inquire Now <i class="fa fa-arrow-right"></i></a>
+            </div>
+          </div>
+
+          <div class="service-detail-card">
+            <img src="https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=600&q=80" alt="Bridal Styling" />
+            <div class="sd-body">
+              <div class="service-icon"><i class="fa fa-magic"></i></div>
+              <h3>Bridal Styling</h3>
+              <p>Professional consultations to help brides achieve their desired wedding-day appearance — hair, makeup guidance, and total look curation.</p>
+              <a class="sd-link" href="#" onclick="showPage('contact')">Book Styling Session <i class="fa fa-arrow-right"></i></a>
+            </div>
+          </div>
+
+          <div class="service-detail-card">
+            <img src="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?w=600&q=80" alt="Bridesmaids Dresses" />
+            <div class="sd-body">
+              <div class="service-icon"><i class="fa fa-heart"></i></div>
+              <h3>Bridesmaids Dresses</h3>
+              <p>Beautiful coordinated dresses available in various colors and designs, so your entire bridal party shines together in harmony.</p>
+              <a class="sd-link" href="#" onclick="showPage('gallery')">See Collection <i class="fa fa-arrow-right"></i></a>
+            </div>
+          </div>
+
+          <div class="service-detail-card">
+            <img src="https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?w=600&q=80" alt="Bridal Accessories" />
+            <div class="sd-body">
+              <div class="service-icon"><i class="fa fa-gem"></i></div>
+              <h3>Bridal Accessories</h3>
+              <p>Veils, tiaras, jewelry, shoes, gloves, and other finishing touches — because every detail matters on your perfect day.</p>
+              <a class="sd-link" href="#" onclick="showPage('gallery')">Browse Accessories <i class="fa fa-arrow-right"></i></a>
+            </div>
+          </div>
+
+          <div class="service-detail-card">
+            <img src="https://images.unsplash.com/photo-1568295093565-cbe7df069e3f?w=600&q=80" alt="Alterations & Fittings" />
+            <div class="sd-body">
+              <div class="service-icon"><i class="fa fa-scissors"></i></div>
+              <h3>Alterations & Fittings</h3>
+              <p>Professional adjustments to ensure the perfect fit and comfort. Our expert seamstresses ensure your gown hugs every curve beautifully.</p>
+              <a class="sd-link" href="#" onclick="showPage('contact')">Schedule Fitting <i class="fa fa-arrow-right"></i></a>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- PROCESS -->
+    <section class="section process-section">
+      <div class="container">
+        <div class="centered">
+          <span class="section-label">How It Works</span>
+          <h2 class="section-title">Your Bridal Journey with Us</h2>
+          <div class="divider center"></div>
+        </div>
+        <div class="process-steps">
+          <div class="process-step">
+            <div class="step-num">01</div>
+            <h4>Book Appointment</h4>
+            <p>Schedule your personalized consultation through our contact form, phone, or WhatsApp.</p>
+          </div>
+          <div class="process-step">
+            <div class="step-num">02</div>
+            <h4>Consultation</h4>
+            <p>Meet with our bridal experts to discuss your vision, style, and preferences.</p>
+          </div>
+          <div class="process-step">
+            <div class="step-num">03</div>
+            <h4>Try & Select</h4>
+            <p>Try on handpicked gowns and discover the one that makes you feel like a bride.</p>
+          </div>
+          <div class="process-step">
+            <div class="step-num">04</div>
+            <h4>Alterations</h4>
+            <p>Our seamstresses perfect the fit through meticulous fittings and adjustments.</p>
+          </div>
+          <div class="process-step">
+            <div class="step-num">05</div>
+            <h4>Your Big Day</h4>
+            <p>Walk down the aisle with confidence, elegance, and a gown made for you.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section style="padding:0 0 90px;">
+      <div class="cta-banner">
+        <h2>Ready to Find Your Perfect Gown?</h2>
+        <p>Book your appointment today and let the journey begin.</p>
+        <div class="cta-btns">
+          <a class="btn btn-primary" href="#" onclick="showPage('contact')">
+            <i class="fa fa-calendar"></i> Book Now
+          </a>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /services page -->
+
+  <!-- ══════════════════════════════════════
+       GALLERY PAGE
+  ══════════════════════════════════════ -->
+  <div class="page" id="page-gallery">
+
+    <div class="gallery-hero">
+      <div>
+        <span class="section-label" style="justify-content:center;display:flex;">Our Portfolio</span>
+        <h1>Bridal Gallery</h1>
+        <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.3rem;opacity:.85;">Beauty captured, elegance remembered</p>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="container">
+        <div class="gallery-filters">
+          <button class="filter-btn active" onclick="filterGallery('all',this)">All</button>
+          <button class="filter-btn" onclick="filterGallery('gowns',this)">Mushanana</button>
+          <button class="filter-btn" onclick="filterGallery('bridesmaids',this)">Bridesmaids</button>
+          <button class="filter-btn" onclick="filterGallery('accessories',this)">Accessories</button>
+          <button class="filter-btn" onclick="filterGallery('brides',this)">Happy Brides</button>
+          <button class="filter-btn" onclick="filterGallery('collections',this)">Collections</button>
+        </div>
+
+        <div class="gallery-masonry" id="galleryMasonry">
+          <div class="gal-item" data-cat="gowns" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="https://images.unsplash.com/photo-1519741497674-611481863552?w=600&q=80" alt="Wedding Gown 1" />
+            <div class="gal-overlay">Ivory A-Line Gown</div>
+          </div>
+          <div class="gal-item" data-cat="brides" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&q=80" alt="Happy Bride 1" />
+            <div class="gal-overlay">Happy Bride</div>
+          </div>
+          <div class="gal-item" data-cat="accessories" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?w=600&q=80" alt="Accessories" />
+            <div class="gal-overlay">Bridal Accessories</div>
+          </div>
+          <div class="gal-item" data-cat="gowns" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="https://images.unsplash.com/photo-1594552072238-b8a33785b6cd?w=600&q=80" alt="Wedding Gown 2" />
+            <div class="gal-overlay">Lace Ballgown</div>
+          </div>
+          <div class="gal-item" data-cat="bridesmaids" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?w=600&q=80" alt="Bridesmaids" />
+            <div class="gal-overlay">Bridesmaids in Blush</div>
+          </div>
+          <div class="gal-item" data-cat="collections" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="https://images.unsplash.com/photo-1568295093565-cbe7df069e3f?w=600&q=80" alt="Collection" />
+            <div class="gal-overlay">Spring Collection</div>
+          </div>
+          <div class="gal-item" data-cat="gowns" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=600&q=80" alt="Wedding Gown 3" />
+            <div class="gal-overlay">Elegant Mermaid Gown</div>
+          </div>
+          <div class="gal-item" data-cat="brides" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="https://images.unsplash.com/photo-1544717301-9cdcb1f5940f?w=600&q=80" alt="Happy Bride 2" />
+            <div class="gal-overlay">Radiant Bride</div>
+          </div>
+          <div class="gal-item" data-cat="collections" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="https://images.unsplash.com/photo-1521543298264-785fba5614bd?w=600&q=80" alt="Collection 2" />
+            <div class="gal-overlay">Couture Collection</div>
+          </div>
+          <div class="gal-item" data-cat="accessories" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=600&q=80" alt="Accessories 2" />
+            <div class="gal-overlay">Jewelry & Details</div>
+          </div>
+          <div class="gal-item" data-cat="bridesmaids" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="https://images.unsplash.com/photo-1580489944761-15a19d654956?w=600&q=80" alt="Bridesmaids 2" />
+            <div class="gal-overlay">Elegant Bridesmaids</div>
+          </div>
+          <div class="gal-item" data-cat="brides" onclick="openLightbox(this.querySelector('img').src)">
+            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80" alt="Happy Bride 3" />
+            <div class="gal-overlay">Wedding Day Joy</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /gallery page -->
+
+  <!-- ══════════════════════════════════════
+       TESTIMONIALS PAGE
+  ══════════════════════════════════════ -->
+  <div class="page" id="page-testimonials">
+
+    <div class="testimonials-hero">
+      <div>
+        <span class="section-label" style="justify-content:center;display:flex;">Real Stories</span>
+        <h1>Our Brides Speak</h1>
+        <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.3rem;opacity:.85;">Their joy is our greatest achievement</p>
+      </div>
+    </div>
+
+    <div class="rating-summary">
+      <div class="container">
+        <div class="rating-items">
+          <div class="rating-item">
+            <div class="big-num">5.0</div>
+            <div class="stars">★★★★★</div>
+            <span>Average Rating</span>
+          </div>
+          <div class="rating-item">
+            <div class="big-num">500+</div>
+            <div class="stars" style="color:var(--primary);">♥ ♥ ♥ ♥ ♥</div>
+            <span>Happy Brides</span>
+          </div>
+          <div class="rating-item">
+            <div class="big-num">98%</div>
+            <div class="stars" style="color:#4ade80;">✓ ✓ ✓ ✓ ✓</div>
+            <span>Would Recommend</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="container">
+        <div class="testi-full-grid">
+
+          <div class="testi-full-card">
+            <div class="quote-icon">"</div>
+            <div class="testi-stars" style="color:var(--accent);margin-bottom:12px;">★★★★★</div>
+            <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.08rem;color:var(--text-lt);line-height:1.85;margin-bottom:24px;">
+              "Witad Bridal Collection made my wedding preparations effortless. The team was professional, welcoming, and helped me find the perfect gown. I felt like a true queen on my special day!"
+            </p>
+            <div class="testi-author">
+              <img src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=100&q=80" alt="Sarah" class="testi-avatar" />
+              <div>
+                <div class="testi-name">Sarah Nakamura</div>
+                <div class="testi-date">Wedding Date: 15 March 2025</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="testi-full-card">
+            <div class="quote-icon">"</div>
+            <div class="testi-stars" style="color:var(--accent);margin-bottom:12px;">★★★★★</div>
+            <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.08rem;color:var(--text-lt);line-height:1.85;margin-bottom:24px;">
+              "From the moment I walked in, I felt at home. The collection is breathtaking and the staff truly understands what every bride needs. Highly recommend Witad to every bride in Uganda!"
+            </p>
+            <div class="testi-author">
+              <img src="https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=100&q=80" alt="Amara" class="testi-avatar" />
+              <div>
+                <div class="testi-name">Amara Kiggundu</div>
+                <div class="testi-date">Wedding Date: 18 January 2025</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="testi-full-card">
+            <div class="quote-icon">"</div>
+            <div class="testi-stars" style="color:var(--accent);margin-bottom:12px;">★★★★★</div>
+            <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.08rem;color:var(--text-lt);line-height:1.85;margin-bottom:24px;">
+              "The alterations team was phenomenal — my dress fit like it was made for me. I couldn't have asked for a more beautiful and stress-free experience. Thank you Witad!"
+            </p>
+            <div class="testi-author">
+              <img src="https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&q=80" alt="Grace" class="testi-avatar" />
+              <div>
+                <div class="testi-name">Grace Otim</div>
+                <div class="testi-date">Wedding Date: 7 December 2024</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="testi-full-card">
+            <div class="quote-icon">"</div>
+            <div class="testi-stars" style="color:var(--accent);margin-bottom:12px;">★★★★★</div>
+            <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.08rem;color:var(--text-lt);line-height:1.85;margin-bottom:24px;">
+              "I was nervous about finding the right gown, but the Witad team made it so joyful. They listened to every detail and guided me perfectly. I cried when I found my dress — it was perfect!"
+            </p>
+            <div class="testi-author">
+              <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80" alt="Diana" class="testi-avatar" />
+              <div>
+                <div class="testi-name">Diana Nakirya</div>
+                <div class="testi-date">Wedding Date: 22 October 2024</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="testi-full-card">
+            <div class="quote-icon">"</div>
+            <div class="testi-stars" style="color:var(--accent);margin-bottom:12px;">★★★★★</div>
+            <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.08rem;color:var(--text-lt);line-height:1.85;margin-bottom:24px;">
+              "Beautiful selection, warm staff, and a lovely atmosphere. My bridesmaids dresses were absolutely gorgeous — everyone kept complimenting us! Witad is truly special."
+            </p>
+            <div class="testi-author">
+              <img src="https://images.unsplash.com/photo-1544717301-9cdcb1f5940f?w=100&q=80" alt="Patricia" class="testi-avatar" />
+              <div>
+                <div class="testi-name">Patricia Nalwoga</div>
+                <div class="testi-date">Wedding Date: 5 August 2024</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="testi-full-card">
+            <div class="quote-icon">"</div>
+            <div class="testi-stars" style="color:var(--accent);margin-bottom:12px;">★★★★★</div>
+            <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.08rem;color:var(--text-lt);line-height:1.85;margin-bottom:24px;">
+              "The rental option was perfect for my budget. I looked like a million shillings and everyone thought my gown was custom-made. Thank you Witad for making my dream accessible!"
+            </p>
+            <div class="testi-author">
+              <img src="https://images.unsplash.com/photo-1521543298264-785fba5614bd?w=100&q=80" alt="Sandra" class="testi-avatar" />
+              <div>
+                <div class="testi-name">Sandra Akello</div>
+                <div class="testi-date">Wedding Date: 14 June 2024</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <section style="padding:0 0 90px;">
+      <div class="cta-banner">
+        <h2>Ready to Write Your Own Story?</h2>
+        <p>Join hundreds of happy brides who trusted Witad Bridal Collection with their most important day.</p>
+        <div class="cta-btns">
+          <a class="btn btn-primary" href="#" onclick="showPage('contact')">
+            <i class="fa fa-calendar"></i> Book Your Appointment
+          </a>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /testimonials page -->
+
+  <!-- ══════════════════════════════════════
+       BLOG PAGE
+  ══════════════════════════════════════ -->
+  <div class="page" id="page-blog">
+
+    <div class="blog-hero">
+      <div>
+        <span class="section-label" style="justify-content:center;display:flex;">Inspiration & Tips</span>
+        <h1>Bridal Journal</h1>
+        <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.3rem;opacity:.85;">Stories, trends, and guidance for the modern bride</p>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="container">
+        <div class="blog-layout">
+          <div>
+            <!-- FEATURED -->
+            <div class="blog-featured">
+              <img src="https://images.unsplash.com/photo-1519741497674-611481863552?w=800&q=80" alt="Featured Post" />
+              <div class="blog-featured-body">
+                <span class="gold-tag">Bridal Fashion Trends</span>
+                <h2 style="font-size:1.7rem;margin:14px 0 12px;">2025's Most Beautiful Wedding Gown Silhouettes — And How to Choose Yours</h2>
+                <p style="color:var(--text-lt);font-size:0.92rem;line-height:1.8;margin-bottom:20px;">This season's bridal collections are celebrating body diversity and personal expression more than ever. From flowy bohemian silhouettes to sculpted mermaid gowns, discover which style speaks to your soul and complements your vision...</p>
+                <div class="blog-meta">
+                  <span><i class="fa fa-user" style="color:var(--accent);margin-right:4px;"></i> Witad Team</span>
+                  <span><i class="fa fa-calendar" style="color:var(--accent);margin-right:4px;"></i> May 20, 2025</span>
+                  <span><i class="fa fa-clock" style="color:var(--accent);margin-right:4px;"></i> 6 min read</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- GRID -->
+            <div class="blog-posts-grid">
+              <div class="blog-card">
+                <img src="https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?w=400&q=80" alt="Post 2" />
+                <div class="blog-card-body">
+                  <span class="blog-cat-tag">Wedding Planning Tips</span>
+                  <h3>12 Things Every Bride Should Do 3 Months Before the Wedding</h3>
+                  <p style="color:var(--text-lt);">From confirming your final fitting to choosing the right accessories, here's your complete pre-wedding checklist...</p>
+                  <div class="blog-meta">
+                    <span><i class="fa fa-calendar" style="color:var(--accent);margin-right:4px;"></i> May 12, 2025</span>
+                    <span>5 min read</span>
+                  </div>
+                </div>
+              </div>
+              <div class="blog-card">
+                <img src="https://images.unsplash.com/photo-1594552072238-b8a33785b6cd?w=400&q=80" alt="Post 3" />
+                <div class="blog-card-body">
+                  <span class="blog-cat-tag">Bridal Beauty Advice</span>
+                  <h3>Skincare Secrets for a Glowing Wedding Day Complexion</h3>
+                  <p style="color:var(--text-lt);">Start this 8-week skincare ritual and walk down the aisle with the most luminous skin of your life...</p>
+                  <div class="blog-meta">
+                    <span><i class="fa fa-calendar" style="color:var(--accent);margin-right:4px;"></i> May 5, 2025</span>
+                    <span>4 min read</span>
+                  </div>
+                </div>
+              </div>
+              <div class="blog-card">
+                <img src="https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=400&q=80" alt="Post 4" />
+                <div class="blog-card-body">
+                  <span class="blog-cat-tag">Accessory Guides</span>
+                  <h3>How to Choose the Perfect Bridal Veil for Your Gown Style</h3>
+                  <p style="color:var(--text-lt);">Cathedral, fingertip, or blusher? Our guide matches every veil style to every gown silhouette...</p>
+                  <div class="blog-meta">
+                    <span><i class="fa fa-calendar" style="color:var(--accent);margin-right:4px;"></i> April 28, 2025</span>
+                    <span>3 min read</span>
+                  </div>
+                </div>
+              </div>
+              <div class="blog-card">
+                <img src="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?w=400&q=80" alt="Post 5" />
+                <div class="blog-card-body">
+                  <span class="blog-cat-tag">Real Bride Stories</span>
+                  <h3>Sarah & David: A Garden Wedding in Kabwohe-Sheema with a Dreamy Witad Gown</h3>
+                  <p style="color:var(--text-lt);">Read Sarah's beautiful love story and discover the gown she chose for her magical garden ceremony...</p>
+                  <div class="blog-meta">
+                    <span><i class="fa fa-calendar" style="color:var(--accent);margin-right:4px;"></i> April 18, 2025</span>
+                    <span>7 min read</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SIDEBAR -->
+          <div class="blog-sidebar">
+            <div class="sidebar-widget">
+              <h4>Categories</h4>
+              <ul class="cat-list">
+                <li><span>Bridal Fashion Trends</span><span class="cat-count">12</span></li>
+                <li><span>Wedding Planning Tips</span><span class="cat-count">8</span></li>
+                <li><span>Bridal Beauty Advice</span><span class="cat-count">7</span></li>
+                <li><span>Accessory Guides</span><span class="cat-count">5</span></li>
+                <li><span>Real Bride Stories</span><span class="cat-count">9</span></li>
+                <li><span>Seasonal Collections</span><span class="cat-count">4</span></li>
+              </ul>
+            </div>
+            <div class="sidebar-widget">
+              <h4>Recent Posts</h4>
+              <div class="recent-post">
+                <img src="https://images.unsplash.com/photo-1568295093565-cbe7df069e3f?w=100&q=80" alt="" />
+                <div>
+                  <h5>Choosing Between Renting vs Buying Your Wedding Gown</h5>
+                  <span>April 10, 2025</span>
+                </div>
+              </div>
+              <div class="recent-post">
+                <img src="https://images.unsplash.com/photo-1544717301-9cdcb1f5940f?w=100&q=80" alt="" />
+                <div>
+                  <h5>Top Bridesmaids Dress Colors for 2025</h5>
+                  <span>April 2, 2025</span>
+                </div>
+              </div>
+              <div class="recent-post">
+                <img src="https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&q=80" alt="" />
+                <div>
+                  <h5>What to Expect at Your First Bridal Fitting</h5>
+                  <span>March 25, 2025</span>
+                </div>
+              </div>
+            </div>
+            <div class="sidebar-widget" style="background:linear-gradient(135deg,#2a1a25,#1e1018);border-color:rgba(201,168,76,0.2);">
+              <h4 style="color:#fff;">Book a Consultation</h4>
+              <p style="font-size:0.85rem;color:rgba(54, 52, 52, 0.6);margin-bottom:16px;line-height:1.7;">Ready to find your dream gown? Our bridal experts are here to guide you.</p>
+              <a class="btn btn-primary" href="#" onclick="showPage('contact')" style="width:100%;justify-content:center;">
+                <i class="fa fa-calendar"></i> Book Now
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /blog page -->
+
+  <!-- ══════════════════════════════════════
+       VISIT US PAGE
+  ══════════════════════════════════════ -->
+  <div class="page" id="page-visit">
+
+    <div class="visit-hero">
+      <div>
+        <span class="section-label" style="justify-content:center;display:flex;">Find Us</span>
+        <h1>Visit Our Studio</h1>
+        <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.3rem;opacity:.85;">We'd love to welcome you in person</p>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="container">
+        <div class="visit-grid">
+          <div>
+            <span class="section-label">Location & Hours</span>
+            <h2 class="section-title">Plan Your Visit</h2>
+            <div class="divider"></div>
+
+            <div class="info-card">
+              <div class="info-card-icon"><i class="fa fa-map-marker-alt"></i></div>
+              <div>
+                <h4>Our Address</h4>
+                <p>Witad Bridal Collection<br>Kabwohe-Sheema, Uganda</p>
+              </div>
+            </div>
+
+            <div class="info-card">
+              <div class="info-card-icon"><i class="fa fa-clock"></i></div>
+              <div>
+                <h4>Working Hours</h4>
+                <p>
+                  Monday – Friday: 8:00 AM – 7:00 PM<br>
+                  Saturday: 9:00 AM – 6:00 PM<br>
+                  Sunday: By Appointment Only
+                </p>
+              </div>
+            </div>
+
+            <div class="info-card">
+              <div class="info-card-icon"><i class="fa fa-phone"></i></div>
+              <div>
+                <h4>Phone & WhatsApp</h4>
+                <p><a href="tel:+256XXXXXXXXX">+256 750 900 134</a><br>
+                <a href="https://wa.me/256XXXXXXXXX" target="_blank">Message us on WhatsApp</a></p>
+              </div>
+            </div>
+
+            <div class="info-card">
+              <div class="info-card-icon"><i class="fa fa-envelope"></i></div>
+              <div>
+                <h4>Email</h4>
+                <p><a href="mailto:info@witadbridal.com">info@witadbridal.com</a></p>
+              </div>
+            </div>
+
+            <div style="margin-top:10px;">
+              <h4 style="font-size:1rem;margin-bottom:14px;">Nearby Landmarks</h4>
+              <ul style="list-style:none;display:flex;flex-direction:column;gap:10px;">
+                <li style="display:flex;align-items:center;gap:10px;font-size:0.9rem;color:var(--text-lt);">
+                  <i class="fa fa-map-pin" style="color:var(--accent);"></i> Near Ebo Bank-Kabwohe-Sheema branch
+                </li>
+                <li style="display:flex;align-items:center;gap:10px;font-size:0.9rem;color:var(--text-lt);">
+                  <i class="fa fa-map-pin" style="color:var(--accent);"></i> Accessible by boda-boda and taxi
+                </li>
+                <li style="display:flex;align-items:center;gap:10px;font-size:0.9rem;color:var(--text-lt);">
+                  <i class="fa fa-map-pin" style="color:var(--accent);"></i> Ample parking available nearby
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div>
+            <div class="map-container">
+              <i class="fa fa-map-marked-alt"></i>
+              <strong style="font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--text);">Witad Bridal Collection</strong>
+              <p>Kabwohe-Sheema, Uganda</p>
+              <a href="https://maps.app.goo.gl/xhnR28g73qb2jXR17" target="_blank" class="btn btn-primary" style="margin-top:8px;">
+                <i class="fa fa-directions"></i> Get Directions
+              </a>
+              <p style="font-size:0.78rem;color:var(--text-lt);margin-top:8px;">Opens in Google Maps</p>
+            </div>
+
+            <div style="margin-top:28px;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:24px;">
+              <h4 style="font-size:1rem;margin-bottom:6px;">Getting Here</h4>
+              <p style="font-size:0.87rem;color:var(--text-lt);line-height:1.8;">
+                We are centrally located in Kabwohe-Sheema and easy to reach by boda-boda, special hire, or public transport. Call us and we'll provide turn-by-turn directions from your location!
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- APPOINTMENT FORM -->
+    <section class="section appt-form-section">
+      <div class="container">
+        <div class="centered" style="margin-bottom:52px;">
+          <span class="section-label">Book a Visit</span>
+          <h2 class="section-title">Schedule Your Appointment</h2>
+          <div class="divider center"></div>
+          <p class="section-desc">Fill in the form below and our team will confirm your appointment within 24 hours.</p>
+        </div>
+        <div style="max-width:680px;margin:0 auto;">
+          <div class="form-card">
+            <form method="POST" action="witad.php">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Full Name *</label>
+                  <input type="text" name="full_name" placeholder="Your full name" required />
+                </div>
+                <div class="form-group">
+                  <label>Phone Number *</label>
+                  <input type="tel" name="phone" placeholder="+256 XXX XXX XXX" required />
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" name="email" placeholder="your@email.com" />
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Wedding Date</label>
+                  <input type="date" name="wedding_date" />
+                </div>
+                <div class="form-group">
+                  <label>Service Needed</label>
+                  <select name="service_needed">
+                    <option value="">Select a service...</option>
+                    <option value="Bridal Gown Sales">Bridal Gown Sales</option>
+                    <option value="Bridal Gown Rental">Bridal Gown Rental</option>
+                    <option value="Bridal Styling">Bridal Styling</option>
+                    <option value="Bridesmaids Dresses">Bridesmaids Dresses</option>
+                    <option value="Accessories">Accessories</option>
+                    <option value="Alterations & Fittings">Alterations & Fittings</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Additional Notes</label>
+                <textarea name="notes" placeholder="Tell us a bit about your wedding vision..."></textarea>
+              </div>
+              <button type="submit" name="submit_booking" class="submit-btn">
+                <i class="fa fa-calendar-check"></i> Book My Appointment
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /visit page -->
+
+  <!-- ══════════════════════════════════════
+       FAQ PAGE
+  ══════════════════════════════════════ -->
+  <div class="page" id="page-faq">
+
+    <div class="faq-hero">
+      <div>
+        <span class="section-label" style="justify-content:center;display:flex;">Help Centre</span>
+        <h1>Frequently Asked Questions</h1>
+        <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.3rem;opacity:.85;">Everything you need to know about your bridal experience</p>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="container faq-container">
+
+        <div class="faq-category">
+          <h3><i class="fa fa-calendar" style="color:var(--accent);"></i> Appointments & Visits</h3>
+
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              Do I need an appointment to visit?
+              <i class="fa fa-plus"></i>
+            </button>
+            <div class="faq-answer">
+              Appointments are recommended to ensure personalized service and dedicated attention from our bridal consultants. Walk-ins are welcome but subject to availability. We highly encourage booking in advance, especially on weekends.
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              How long does a bridal consultation take?
+              <i class="fa fa-plus"></i>
+            </button>
+            <div class="faq-answer">
+              A standard bridal consultation typically takes 1 to 2 hours. This gives us enough time to understand your vision, show you curated selections, and have you try on gowns in a relaxed, unhurried environment.
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              Can I bring family or friends to my appointment?
+              <i class="fa fa-plus"></i>
+            </button>
+            <div class="faq-answer">
+              Absolutely! We encourage you to bring your closest support — whether that's your mum, sister, or best friend. We recommend keeping your group to 2–3 people to ensure a focused and enjoyable experience.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-category">
+          <h3><i class="fa fa-star" style="color:var(--accent);"></i> Gowns & Rentals</h3>
+
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              Do you offer gown rentals?
+              <i class="fa fa-plus"></i>
+            </button>
+            <div class="faq-answer">
+              Yes! We provide both rental and sales options. Our rental collection features elegant, well-maintained gowns across a range of styles and sizes. Rentals are a wonderful choice for brides seeking sophistication at an accessible price point.
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              How early should I start shopping for my wedding gown?
+              <i class="fa fa-plus"></i>
+            </button>
+            <div class="faq-answer">
+              We recommend beginning your gown search at least 4–6 months before your wedding date. This allows ample time for selection, alterations, and any final fittings. For made-to-order or custom gowns, 6–9 months is ideal.
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              Do you carry plus-size or custom-sized gowns?
+              <i class="fa fa-plus"></i>
+            </button>
+            <div class="faq-answer">
+              We celebrate every body shape and size. Our collection includes a range of sizes, and our alterations team can expertly adjust gowns to fit beautifully. We also offer custom fitting consultations for personalized sizing.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-category">
+          <h3><i class="fa fa-scissors" style="color:var(--accent);"></i> Alterations & Fittings</h3>
+
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              Can dresses be altered?
+              <i class="fa fa-plus"></i>
+            </button>
+            <div class="faq-answer">
+              Yes, professional alteration services are available at Witad Bridal Collection. Our expert seamstresses can adjust hemlines, take in or let out seams, add bustles, and make any necessary modifications to ensure your gown fits perfectly.
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              How many fittings will I need?
+              <i class="fa fa-plus"></i>
+            </button>
+            <div class="faq-answer">
+              Most brides require 2–3 fittings. The first is to take measurements and begin alterations, the second to check progress, and the final fitting to confirm the perfect fit before your big day. We'll guide you through every step.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-category">
+          <h3><i class="fa fa-gem" style="color:var(--accent);"></i> Accessories & Services</h3>
+
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              Do you sell bridal accessories?
+              <i class="fa fa-plus"></i>
+            </button>
+            <div class="faq-answer">
+              Yes! We offer a complete range of bridal accessories including veils, tiaras, jewelry, shoes, gloves, and other finishing touches to complete your perfect bridal look — all under one roof.
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              Do you dress bridesmaids too?
+              <i class="fa fa-plus"></i>
+            </button>
+            <div class="faq-answer">
+              Absolutely. Our bridesmaids collection features beautiful coordinated dresses in various colors and designs. We can help you choose a cohesive look that complements your bridal gown beautifully.
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              What are your payment options?
+              <i class="fa fa-plus"></i>
+            </button>
+            <div class="faq-answer">
+              We accept cash, mobile money (MTN & Airtel), and bank transfers. For gown purchases and rentals, we can discuss flexible payment arrangements. Please contact us for details on our current payment plans.
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align:center;margin-top:20px;padding:40px;background:var(--bg-card);border:1px solid var(--border);border-radius:20px;">
+          <h3 style="font-size:1.3rem;margin-bottom:10px;">Still Have Questions?</h3>
+          <p style="color:var(--text-lt);margin-bottom:24px;font-size:0.92rem;">Our team is happy to help with anything not covered here.</p>
+          <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
+            <a class="btn btn-primary" href="#" onclick="showPage('contact')">
+              <i class="fa fa-envelope"></i> Contact Us
+            </a>
+            <a class="btn btn-outline-dark" href="https://wa.me/256XXXXXXXXX" target="_blank">
+              <i class="fab fa-whatsapp"></i> WhatsApp Us
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </div><!-- /faq page -->
+
+  <!-- ══════════════════════════════════════
+       CONTACT PAGE
+  ══════════════════════════════════════ -->
+  <div class="page" id="page-contact">
+
+    <div class="contact-hero">
+      <div>
+        <span class="section-label" style="justify-content:center;display:flex;">Get in Touch</span>
+        <h1>Contact Us</h1>
+        <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.3rem;opacity:.85;">We're excited to be part of your wedding journey</p>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="container">
+        <div class="contact-layout">
+          <div class="contact-info">
+            <span class="section-label">Reach Out</span>
+            <h2 class="section-title">Let's Talk About Your Dream Day</h2>
+            <div class="divider"></div>
+            <p style="color:var(--text-lt);font-size:0.95rem;line-height:1.85;margin-bottom:32px;">
+              Whether you have questions, want to book an appointment, or simply want to explore our collection, we're here for you. Fill in the form or reach us directly through any of the channels below.
+            </p>
+
+            <div class="info-card">
+              <div class="info-card-icon"><i class="fa fa-map-marker-alt"></i></div>
+              <div>
+                <h4>Our Location</h4>
+                <p>Witad Bridal Collection, Kabwohe-Sheema, Uganda</p>
+              </div>
+            </div>
+            <div class="info-card">
+              <div class="info-card-icon"><i class="fa fa-phone"></i></div>
+              <div>
+                <h4>Phone</h4>
+                <p><a href="tel:+256XXXXXXXXX">+256 XXX XXX XXX</a></p>
+              </div>
+            </div>
+            <div class="info-card">
+              <div class="info-card-icon"><i class="fa fa-envelope"></i></div>
+              <div>
+                <h4>Email</h4>
+                <p><a href="mailto:info@witadbridal.com">info@witadbridal.com</a></p>
+              </div>
+            </div>
+
+            <div style="margin-top:28px;">
+              <h4 style="font-size:0.95rem;margin-bottom:16px;">Follow Us</h4>
+              <div class="social-links">
+                <a href="#" class="social-link fb" title="Facebook"><i class="fab fa-facebook-f"></i></a>
+                <a href="#" class="social-link ig" title="Instagram"><i class="fab fa-instagram"></i></a>
+                <a href="#" class="social-link tt" title="TikTok"><i class="fab fa-tiktok"></i></a>
+                <a href="https://wa.me/256XXXXXXXXX" class="social-link wa" title="WhatsApp" target="_blank"><i class="fab fa-whatsapp"></i></a>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="form-card">
+              <h3 style="font-size:1.4rem;margin-bottom:6px;">Book an Appointment</h3>
+              <p style="font-size:0.87rem;color:var(--text-lt);margin-bottom:28px;">Fill in your details and we'll be in touch within 24 hours.</p>
+              <form method="POST" action="witad.php">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Full Name *</label>
+        <!-- ADDED: name="full_name" -->
+        <input type="text" name="full_name" placeholder="Your full name" required />
+      </div>
+      <div class="form-group">
+        <label>Phone Number *</label>
+        <!-- ADDED: name="phone" -->
+        <input type="tel" name="phone" placeholder="+256 XXX XXX XXX" required />
+      </div>
+    </div>
+    
+    <div class="form-group">
+      <label>Email Address</label>
+      <!-- ADDED: name="email" -->
+      <input type="email" name="email" placeholder="your@email.com" />
+    </div>
+    
+    <div class="form-group">
+      <label>Wedding Date</label>
+      <!-- ADDED: name="wedding_date" -->
+      <input type="date" name="wedding_date" />
+    </div>
+    
+    <div class="form-group">
+      <label>Service Interested In</label>
+      <!-- ADDED: name="service_needed" and explicit value attributes to options -->
+      <select name="service_needed">
+        <option value="">Select a service...</option>
+        <option value="Bridal Gown Sales">Bridal Gown Sales</option>
+        <option value="Bridal Gown Rental">Bridal Gown Rental</option>
+        <option value="Bridal Styling">Bridal Styling</option>
+        <option value="Bridesmaids Dresses">Bridesmaids Dresses</option>
+        <option value="Accessories">Accessories</option>
+        <option value="Alterations & Fittings">Alterations & Fittings</option>
+        <option value="General Enquiry">General Enquiry</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label>Your Message</label>
+      <!-- ADDED: name="notes" -->
+      <textarea name="notes" placeholder="Tell us about your wedding vision, questions, or any special requests..."></textarea>
+    </div>
+    
+    <!-- ADDED: name="submit_booking" to the button -->
+    <button type="submit" name="submit_booking" class="submit-btn">
+      <i class="fa fa-paper-plane"></i> Send Message
+    </button>
+    
+    <a href="https://wa.me/256XXXXXXXXX" class="whatsapp-btn" target="_blank">
+      <i class="fab fa-whatsapp" style="font-size:1.2rem;"></i> Chat on WhatsApp Instead
+    </a>
+</form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /contact page -->
+
+  <!-- ══════════════════════════════════════
+       FOOTER
+  ══════════════════════════════════════ -->
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+
+        <div class="footer-brand">
+          <div class="logo" style="margin-bottom:18px;">
+            <span class="logo-name">Witad</span>
+            <span class="logo-tag">Bridal Collection</span>
+          </div>
+          <p>Uganda's premier bridal destination — where every bride finds her perfect look, crafted with elegance, quality, and heart.</p>
+          <div class="footer-social">
+            <a href="#" title="Facebook"><i class="fab fa-facebook-f"></i></a>
+            <a href="#" title="Instagram"><i class="fab fa-instagram"></i></a>
+            <a href="#" title="TikTok"><i class="fab fa-tiktok"></i></a>
+            <a href="https://wa.me/256XXXXXXXXX" title="WhatsApp" target="_blank"><i class="fab fa-whatsapp"></i></a>
+          </div>
+        </div>
+
+        <div class="footer-col">
+          <h4>Quick Links</h4>
+          <ul class="footer-links">
+            <li><a href="#" onclick="showPage('home')"><i class="fa fa-angle-right"></i>Home</a></li>
+            <li><a href="#" onclick="showPage('about')"><i class="fa fa-angle-right"></i>About Us</a></li>
+            <li><a href="#" onclick="showPage('services')"><i class="fa fa-angle-right"></i>Services</a></li>
+            <li><a href="#" onclick="showPage('gallery')"><i class="fa fa-angle-right"></i>Gallery</a></li>
+            <li><a href="#" onclick="showPage('testimonials')"><i class="fa fa-angle-right"></i>Reviews</a></li>
+            <li><a href="#" onclick="showPage('blog')"><i class="fa fa-angle-right"></i>Blog</a></li>
+            <li><a href="#" onclick="showPage('visit')"><i class="fa fa-angle-right"></i>Visit Us</a></li>
+            <li><a href="#" onclick="showPage('faq')"><i class="fa fa-angle-right"></i>FAQ</a></li>
+            <li><a href="#" onclick="showPage('contact')"><i class="fa fa-angle-right"></i>Contact</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Our Services</h4>
+          <ul class="footer-links">
+            <li><a href="#" onclick="showPage('services')"><i class="fa fa-angle-right"></i>Bridal Gown Sales</a></li>
+            <li><a href="#" onclick="showPage('services')"><i class="fa fa-angle-right"></i>Gown Rentals</a></li>
+            <li><a href="#" onclick="showPage('services')"><i class="fa fa-angle-right"></i>Bridal Styling</a></li>
+            <li><a href="#" onclick="showPage('services')"><i class="fa fa-angle-right"></i>Bridesmaids Dresses</a></li>
+            <li><a href="#" onclick="showPage('services')"><i class="fa fa-angle-right"></i>Bridal Accessories</a></li>
+            <li><a href="#" onclick="showPage('services')"><i class="fa fa-angle-right"></i>Alterations & Fittings</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Contact Us</h4>
+          <div class="footer-contact-item">
+            <i class="fa fa-map-marker-alt"></i>
+            <span>Witad Bridal Collection<br>Kabwohe-Sheema, Uganda</span>
+          </div>
+          <div class="footer-contact-item">
+            <i class="fa fa-phone"></i>
+            <span><a href="tel:+256XXXXXXXXX">+256 750 900 134</a></span>
+          </div>
+          <div class="footer-contact-item">
+            <i class="fa fa-envelope"></i>
+            <span><a href="mailto:info@witadbridal.com">info@witadbridal.com</a></span>
+          </div>
+          <div class="footer-contact-item">
+            <i class="fa fa-clock"></i>
+            <span>Mon–Fri: 8AM – 7PM<br>Sat: 9AM – 6PM<br>Sun: By Appointment</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="footer-bottom">
+        <p>© 2025 <a href="#">Witad Bridal Collection</a>. All rights reserved. Made with <i class="fa fa-heart" style="color:var(--primary);"></i> in Uganda.</p>
+        <div class="footer-bottom-links">
+          <a href="#">Privacy Policy</a>
+          <a href="#">Terms of Service</a>
+          <a href="#" onclick="showPage('contact')">Book Appointment</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- LIGHTBOX -->
+  <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+    <span class="lightbox-close" onclick="closeLightbox()"><i class="fa fa-times"></i></span>
+    <img id="lightboxImg" src="" alt="Gallery Image" onclick="event.stopPropagation()" />
+  </div>
+
+  <!-- FLOATING WHATSAPP -->
+  <a href="https://wa.me/256XXXXXXXXX" class="fab-whatsapp" target="_blank" title="Chat on WhatsApp">
+    <i class="fab fa-whatsapp"></i>
+  </a>
+
+  <!-- BACK TO TOP -->
+  <div class="back-top" id="backTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+    <i class="fa fa-arrow-up"></i>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast">
+    <i class="fa fa-check-circle"></i> Message sent! We'll be in touch soon.
+  </div>
+
+  <!-- ══════════════════════════════════════
+       JAVASCRIPT
+  ══════════════════════════════════════ -->
+  <script>
+    /* ── PAGE NAVIGATION ── */
+    function showPage(id) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      const target = document.getElementById('page-' + id);
+      if (target) {
+        target.classList.add('active');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      // Update active nav link
+      document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+      const navEl = document.getElementById('nav-' + id);
+      if (navEl) navEl.classList.add('active');
+
+      return false;
+    }
+
+    /* ── NAVBAR SCROLL ── */
+    window.addEventListener('scroll', () => {
+      const nav = document.getElementById('navbar');
+      nav.classList.toggle('scrolled', window.scrollY > 60);
+
+      const bt = document.getElementById('backTop');
+      bt.classList.toggle('visible', window.scrollY > 400);
+    });
+
+    /* ── MOBILE MENU ── */
+    function openMobile() { document.getElementById('mobileMenu').classList.add('open'); }
+    function closeMobile() { document.getElementById('mobileMenu').classList.remove('open'); }
+
+    /* ── LIGHTBOX ── */
+    function openLightbox(src) {
+      const lb = document.getElementById('lightbox');
+      document.getElementById('lightboxImg').src = src;
+      lb.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeLightbox() {
+      document.getElementById('lightbox').classList.remove('open');
+      document.body.style.overflow = '';
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+
+    /* ── GALLERY FILTER ── */
+    function filterGallery(cat, btn) {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('#galleryMasonry .gal-item').forEach(item => {
+        if (cat === 'all' || item.dataset.cat === cat) {
+          item.style.display = '';
+          item.style.animation = 'fadeIn .4s ease';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    }
+
+    /* ── FAQ ACCORDION ── */
+    function toggleFaq(btn) {
+      const item = btn.parentElement;
+      const isOpen = item.classList.contains('open');
+      document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+      if (!isOpen) item.classList.add('open');
+    }
+
+    /* ── FORM SUBMIT ── */
+    function submitForm(e) {
+      e.preventDefault();
+      const toast = document.getElementById('toast');
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 4000);
+      e.target.reset();
+    }
+
+    /* ── INIT ── */
+    showPage('home');
+  </script>
+
+</body>
+</html>
